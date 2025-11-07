@@ -3,34 +3,16 @@
 # Define server logic
 server <- function(input, output) {
   # Controls ----
-  observeEvent(input$restart, {
-    session$reload()
-  })
+  
   # Input data ----
   dataset <- reactive({
-    if (is.null(input$file)) {
-      corals
-    } else {
-      file <- input$file
-      ext <- tools::file_ext(file$datapath)
-      
-      req(file)
-      validate(need(ext == "csv", "Please upload a csv file"))
-      
-      read.csv(file$datapath, header = TRUE)
-    }
+    corals
   })
+  
   # UI updates ----
-  ## space
-  output$country <- renderUI({
-    selectInput("country", "Select country", 
-                c("All", sort(unique(dataset()$country))),
-                selected = "All")
-  })
-  ## Counts
+  ## Data summary
   output$counts <- renderUI({
     tagList(
-      tags$h6("Data summary"),
       tags$body(paste0("Events: ", length(unique(data()$eventID)))),
       tags$br(),
       tags$body(paste0("Occurrences: ", length(unique(data()$occurrenceID)))),
@@ -38,7 +20,13 @@ server <- function(input, output) {
       tags$body(paste0("Taxa: ", length(unique(data()$taxonID)))),
     )
   })
-  ## Ages
+  ## Taxonomy
+  output$taxon <- renderUI({
+    selectInput("taxon", "Select taxon", 
+                c("All", sort(unique(corals[, input$rank]))),
+                selected = "All")
+  })
+  ## Time
   max_ma <- reactive({
     intervals[which(intervals$age == input$max_age), "max_ma"]
   })
@@ -49,10 +37,29 @@ server <- function(input, output) {
     tagList(
       tags$body(paste0(max_ma(), "–", min_ma(), " Ma")))
   })
-  ## Taxa
-  output$taxon <- renderUI({
-    selectInput("taxon", "Select taxon", 
-                c("All", sort(unique(corals[, input$rank]))),
+  ## Space
+  output$country <- renderUI({
+    selectInput("country", "Select country", 
+                c("All", sort(unique(dataset()$country))),
+                selected = "All")
+  })
+  ## Geological context
+  ### Group
+  output$geogroup <- renderUI({
+    selectInput("geogroup", "Select group",
+                c("All", sort(unique(dataset()$group))),
+                selected = "All")
+  })
+  ### Formation
+  output$formation <- renderUI({
+    selectInput("formation", "Select formation",
+                c("All", sort(unique(dataset()$formation))),
+                selected = "All")
+  })
+  ### Member
+  output$member <- renderUI({
+    selectInput("member", "Select member",
+                c("All", sort(unique(dataset()$member))),
                 selected = "All")
   })
   
@@ -65,8 +72,8 @@ server <- function(input, output) {
     }
     # Time
     tmp <- tmp |>
-      subset(maximumAgeMa <= max_ma()) |>
-      subset(minimumAgeMa >= min_ma())
+      subset(earliestChronometricAge <= max_ma()) |>
+      subset(latestChronometricAge >= min_ma())
     # Geography
     if(!is.null(input$country) && input$country != "All") {
       tmp <- tmp |>
@@ -100,11 +107,15 @@ server <- function(input, output) {
     range_time <- split(x = data(), f = data()[, input$rank])
     range_time <- data.frame(
       taxon = names(range_time),
-      maximumAgeMa = unlist(lapply(range_time, function(x) max(x$maximumAgeMa))),
-      minimumAgeMa = unlist(lapply(range_time, function(x) min(x$minimumAgeMa))))
+      earliestChronometricAge = unlist(lapply(range_time, function(x) max(x$earliestChronometricAge))),
+      latestChronometricAge = unlist(lapply(range_time, function(x) min(x$latestChronometricAge))))
   })
   range_occ <- reactive({
-    unique(data()[, c(input$rank, "maximumAgeMa", "minimumAgeMa", "family", "countryCode")])
+    unique(data()[, c(input$rank, 
+                      "earliestChronometricAge", 
+                      "latestChronometricAge", 
+                      "family", 
+                      "country")])
   })
   
   # Rendering ----
@@ -127,16 +138,13 @@ server <- function(input, output) {
                        lng = ~decimalLongitude,
                        lat = ~decimalLatitude,
                        layerId = ~eventID,
-                       #popup = ~colour,
-                       group = ~assignedAge,
                        radius = 5,
                        stroke = TRUE,
                        weight = 1,
                        opacity = 1,
-                       color = "#36454F",
-                       fillColor = ~ageColour,
-                       fillOpacity = 0.5) |>
-      addLayersControl(overlayGroups = c(data()$assignedAge))
+                       color = "black",
+                       fillColor = "#36454F",
+                       fillOpacity = 0.5)
   })
 
   ## Table
@@ -150,13 +158,16 @@ server <- function(input, output) {
   
   ## Temporal ranges
   output$range <- renderPlot(
-    ggplot(range_time(), aes(xmin = minimumAgeMa, xmax = maximumAgeMa, y = taxon)) +
+    ggplot(range_time(), aes(xmin = earliestChronometricAge, 
+                             xmax = latestChronometricAge, 
+                             y = taxon)) +
       geom_linerange(linetype = 2) +
       geom_linerange(data = range_occ(), 
-                     aes(xmax = maximumAgeMa, xmin = minimumAgeMa,
+                     aes(xmin = earliestChronometricAge,
+                         xmax = latestChronometricAge,
                          y = range_occ()[, input$rank])) +
       geom_point(data = range_occ(), 
-                 aes(x = (maximumAgeMa + minimumAgeMa) / 2, 
+                 aes(x = (earliestChronometricAge + latestChronometricAge) / 2, 
                      y = range_occ()[, input$rank]),
                  colour = "black", fill = "orange",
                  pch = 23) +

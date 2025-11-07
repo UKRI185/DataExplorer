@@ -22,7 +22,7 @@ library(ggplot2)
 # Data
 corals <- readRDS(file = "data/corals.RDS")
 intervals <- readRDS(file = "data/intervals.RDS")
-intervals <- subset(intervals, max_ma <= max(corals$maximumAgeMa))
+intervals <- subset(intervals, max_ma <= max(corals$earliestChronometricAge))
 
 # Parameters
 ## Taxonomic ranks
@@ -34,10 +34,4 @@ int_name <- lapply(unique(intervals$period), function(x) {
   subset(intervals, period == x)$age
 })
 names(int_name) <- unique(intervals$period)
-## Country
-cc <- c("All", sort(unique(corals$countryCode)))
-## Geological context
-group <- c("All", sort(unique(corals$group)))
-formation <- c("All", sort(unique(corals$formation)))
-member <- c("All", sort(unique(corals$member)))
 

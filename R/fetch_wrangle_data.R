@@ -22,12 +22,12 @@ if (params$download) {
   # Read data 
   url <- httr::modify_url(url = params$base_url, query = params$query)
   # Save raw data
-  download.file(url = url, destfile = paste0("app/data/raw/", params$file_name))
+  download.file(url = url, destfile = paste0("raw_data/", params$file_name))
   # Read only
   Sys.chmod(paste0("app/data/raw/", params$file_name), mode = "0444")
 }
 # Read data
-occdf <- read.csv(paste0("app/data/raw/", params$file_name), skip = 20)
+occdf <- read.csv(paste0("raw_data/", params$file_name), skip = 20)
 
 # Get time bins --------------------------------------------------------
 # Get interval data
@@ -75,10 +75,8 @@ occdf <- occdf |>
 
 # Bin data
 occdf <- bin_time(occdf = occdf, bins = age, method = "majority")
-occdf$assignedAge <- age$age[match(x = occdf$bin_assignment, table = age$bin)]
-occdf$max_ma <- age$max_ma[match(x = occdf$bin_assignment, table = age$bin)]
-occdf$min_ma <- age$min_ma[match(x = occdf$bin_assignment, table = age$bin)]
-occdf$ageColour <- age$colour[match(x = occdf$bin_assignment, table = age$bin)]
+# Join dataset
+occdf <- left_join(x = occdf, y = age, by = c("bin_assignment" = "bin"))
 
 # Taxonomy
 occdf$species <- occdf$accepted_name
@@ -124,11 +122,13 @@ occdf <- occdf |>
   rename(taxonID = accepted_no,
          earliestAgeOrLowestStage = early_interval,
          latestAgeOrHighestStage = late_interval,
-         maximumAgeMa = max_ma,
-         minimumAgeMa = min_ma,
+         latestChronometricAge = min_ma.y,
+         earliestChronometricAge = max_ma.y,
          group = geological_group,
          formation = formation,
-         member = member)
+         member = member) |> 
+  mutate(earliestChronometricAgeReferenceSystem = "Ma",
+         latestChronometricAgeReferenceSystem = "Ma")
 
 occdf <- occdf[, c("eventID", "occurrenceID", "basisOfRecord", "year",
                    "decimalLongitude", "decimalLatitude", "country", "countryCode",
@@ -137,9 +137,10 @@ occdf <- occdf[, c("eventID", "occurrenceID", "basisOfRecord", "year",
                    "kingdom", "phylum", "class", "order", "family", "genus",
                    "species", "specificEpithet",
                    "earliestAgeOrLowestStage", "latestAgeOrHighestStage",
-                   "assignedAge", "maximumAgeMa", "minimumAgeMa", "ageColour",
+                   "latestChronometricAge", "latestChronometricAgeReferenceSystem",
+                   "earliestChronometricAge", "earliestChronometricAgeReferenceSystem",
                    "group", "formation", "member")]
 
 # Save data
+occdf <- data.frame(occdf)
 saveRDS(occdf, "app/data/corals.RDS")
-write.csv(occdf, "app/data/corals.csv", row.names = FALSE)

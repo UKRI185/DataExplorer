@@ -18,20 +18,11 @@ ui <- page_navbar(
     input_dark_mode(mode = "light")
   ),
   sidebar = sidebar(
-    actionButton("restart", icon = icon("refresh"),
-                 "Restart session", width = "100%", class = "btn-warning rounded-0"),
     accordion(
       open = TRUE,
       accordion_panel(
-        "Data", icon = bs_icon("database"),
-        uiOutput("counts"),
-        tags$br(),
-        tags$br(),
-        fileInput(inputId = "file", 
-                  label = h6("Upload own dataset"), 
-                  placeholder = "Select '.csv'", 
-                  accept = ".csv"),
-        tags$h6("...or continue with in-built dataset")
+        "Data summary", icon = bs_icon("database"),
+        uiOutput("counts")
       )
     ), 
     h5("Filter"),
@@ -39,16 +30,16 @@ ui <- page_navbar(
               accordion_panel(
                 "Taxonomy", icon = bs_icon("folder"),
                 # Input: Taxonomic rank ----
-                selectInput("rank", "Select taxonomic rank", tax_rank, selected = "genus"),
+                selectInput("rank", "Select rank", tax_rank, selected = "genus"),
                 # Input: Taxon ----
                 uiOutput("taxon")
               ),
               accordion_panel(
                 "Time", icon = bs_icon("hourglass-bottom"),
                 # Input: Time ----
-                selectInput("max_age", "From", int_name,
+                selectInput("max_age", "Maximum age", int_name,
                             selected = "Danian"),
-                selectInput("min_age", "To", int_name, 
+                selectInput("min_age", "Minimum age", int_name, 
                             selected = "Meghalayan"),
                 # Output: Age ----
                 uiOutput("age")
@@ -70,14 +61,11 @@ ui <- page_navbar(
               accordion_panel(
                 "Geological context", icon = bs_icon("hammer"),
                 # Input: Group ----
-                selectInput("geogroup", "Select Group", group,
-                            selected = "All"),
+                uiOutput("geogroup"),
                 # Input: Formation ----
-                selectInput("formation", "Select Formation", formation,
-                            selected = "All"),
+                uiOutput("formation"),
                 # Input: Member ----
-                selectInput("member", "Select Member", member,
-                            selected = "All")
+                uiOutput("member"),
               ),
               accordion_panel(
                 "Metadata", icon = bs_icon("journal")
