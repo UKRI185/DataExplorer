@@ -133,6 +133,7 @@ server <- function(input, output) {
       setMaxBounds(lng1 = -180, lat1 = 90, lng2 = 180, lat2 = -90) |>
       addRectangles(lng1 = input$min_lng, lng2 = input$max_lng, 
                     lat1 = input$min_lat, lat2 = input$max_lat, 
+                    fill = FALSE,
                     group = "Bounding Box") |>
       addCircleMarkers(data = data(),
                        lng = ~decimalLongitude,
@@ -143,7 +144,7 @@ server <- function(input, output) {
                        weight = 1,
                        opacity = 1,
                        color = "black",
-                       fillColor = "#36454F",
+                       fillColor = intervals$colour[match(data()$earliestAgeOrLowestStage, intervals$age)],
                        fillOpacity = 0.5)
   })
 

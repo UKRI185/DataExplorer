@@ -120,14 +120,14 @@ occdf <- occdf |>
                       scientificNameAuthorship = "",
                       taxonRank = accepted_rank) |>
   rename(taxonID = accepted_no,
-         earliestAgeOrLowestStage = early_interval,
-         latestAgeOrHighestStage = late_interval,
          latestChronometricAge = min_ma.y,
          earliestChronometricAge = max_ma.y,
          group = geological_group,
          formation = formation,
          member = member) |> 
-  mutate(earliestChronometricAgeReferenceSystem = "Ma",
+  mutate(earliestAgeOrLowestStage = age,
+         latestAgeOrHighestStage = age,
+         earliestChronometricAgeReferenceSystem = "Ma",
          latestChronometricAgeReferenceSystem = "Ma")
 
 occdf <- occdf[, c("eventID", "occurrenceID", "basisOfRecord", "year",
