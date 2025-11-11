@@ -8,7 +8,8 @@ ui <- page_navbar(
             leafletOutput("map")),
   nav_panel("Table", 
             dataTableOutput("table")),
-  nav_panel("Taxonomy"),
+  nav_panel("Taxonomy",
+            dataTableOutput("taxonomy")),
   nav_panel("Temporal ranges", 
             plotOutput("range")),
   nav_panel("Taxonomic richness"),
@@ -26,7 +27,7 @@ ui <- page_navbar(
       )
     ), 
     h5("Filter"),
-    accordion(open = FALSE,
+    accordion(open = TRUE,
               accordion_panel(
                 "Taxonomy", icon = bs_icon("folder"),
                 # Input: Taxonomic rank ----

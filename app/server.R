@@ -98,37 +98,25 @@ server <- function(input, output) {
         subset(member == input$member)
     }
     # Return data
+    tmp$ageColour <- intervals$colour[match(tmp$earliestAgeOrLowestStage, intervals$age)]
     tmp
   })
   
-  # Analyses ----
-  ## Temporal ranges
-  range_time <- reactive({
-    range_time <- split(x = data(), f = data()[, input$rank])
-    range_time <- data.frame(
-      taxon = names(range_time),
-      earliestChronometricAge = unlist(lapply(range_time, function(x) max(x$earliestChronometricAge))),
-      latestChronometricAge = unlist(lapply(range_time, function(x) min(x$latestChronometricAge))))
-  })
-  range_occ <- reactive({
-    unique(data()[, c(input$rank, 
-                      "earliestChronometricAge", 
-                      "latestChronometricAge", 
-                      "family", 
-                      "country")])
-  })
-  
-  # Rendering ----
+  # Outputs ----
   
   ## Map
+  ####### DATA SHOULD BE SUMMARISED BY EVENT 
+  ####### DATA SHOULD BE SUMMARISED BY EVENT 
+  ####### DATA SHOULD BE SUMMARISED BY EVENT 
+  ### Rendering map
   output$map <- renderLeaflet({
     leaflet() |>
       addProviderTiles(providers$CartoDB.Positron, 
                        options = list(noWrap = TRUE,
                                       minZoom = 2,
                                       maxZoom = 14)) |>
-      setView(lng = (min(corals$decimalLongitude) + max(corals$decimalLongitude)) / 2, 
-              lat = (min(corals$decimalLatitude) + max(corals$decimalLatitude)) / 2, 
+      setView(lng = (min(dataset()$decimalLongitude) + max(dataset()$decimalLongitude)) / 2, 
+              lat = (min(dataset()$decimalLatitude) + max(dataset()$decimalLatitude)) / 2, 
               zoom = 4) |> 
       setMaxBounds(lng1 = -180, lat1 = 90, lng2 = 180, lat2 = -90) |>
       addRectangles(lng1 = input$min_lng, lng2 = input$max_lng, 
@@ -139,15 +127,18 @@ server <- function(input, output) {
                        lng = ~decimalLongitude,
                        lat = ~decimalLatitude,
                        layerId = ~eventID,
+                       popup = paste(data()$eventID, 
+                                     data()$species,
+                                     sep = "<br/>"),
                        radius = 5,
                        stroke = TRUE,
                        weight = 1,
                        opacity = 1,
                        color = "black",
-                       fillColor = intervals$colour[match(data()$earliestAgeOrLowestStage, intervals$age)],
+                       fillColor = ~ageColour,
                        fillOpacity = 0.5)
   })
-
+  
   ## Table
   output$table <- renderDataTable(data(), 
                                   extensions = c("Responsive", "Scroller"), 
@@ -157,29 +148,86 @@ server <- function(input, output) {
                                     scroller = TRUE
                                   ))
   
+  ## Taxonomy
+  ### Reactive filtering and taxon counts
+  taxon_data <- reactive({
+    # Define fields
+    tax_names <- c("scientificName", "kingdom", "phylum", 
+                   "class", "order", "family", "genus", "species")
+    # Subset data
+    tax_tmp <- data()[, tax_names]
+    # Summarise data
+    tax_tmp <- aggregate(x = cbind(tax_tmp[0], occurrences = 1), 
+                         by = tax_tmp, FUN = length)
+    # Reformat columns
+    tax_tmp <- tax_tmp[, c("occurrences", tax_names)]
+    # Order by occurrence counts
+    tax_tmp <- tax_tmp[order(tax_tmp$occurrences, decreasing = TRUE), ]
+    # Remove row names
+    row.names(tax_tmp) <- NULL
+    # Return data
+    tax_tmp
+  })
+  ### Rendering table
+  output$taxonomy <- renderDataTable(taxon_data(), 
+                                     extensions = c("Responsive", "Scroller"), 
+                                     options = list(
+                                       deferRender = TRUE,
+                                       scrollY = 800,
+                                       scroller = TRUE
+                                     ))
+  
   ## Temporal ranges
+  ### Analyses
+  range_time <- reactive({
+    # Split by taxon
+    range_time <- split(x = data(), f = data()[, input$rank])
+    # Calculate maximum and minimin range
+    range_time <- data.frame(
+      taxon = names(range_time),
+      earliestChronometricAge = unlist(lapply(range_time, function(x) max(x$earliestChronometricAge))),
+      latestChronometricAge = unlist(lapply(range_time, function(x) min(x$latestChronometricAge))))
+  })
+  ### Rendering plot
   output$range <- renderPlot(
-    ggplot(range_time(), aes(xmin = earliestChronometricAge, 
-                             xmax = latestChronometricAge, 
-                             y = taxon)) +
-      geom_linerange(linetype = 2) +
-      geom_linerange(data = range_occ(), 
-                     aes(xmin = earliestChronometricAge,
-                         xmax = latestChronometricAge,
-                         y = range_occ()[, input$rank])) +
-      geom_point(data = range_occ(), 
-                 aes(x = (earliestChronometricAge + latestChronometricAge) / 2, 
-                     y = range_occ()[, input$rank]),
-                 colour = "black", fill = "orange",
-                 pch = 23) +
-      scale_x_reverse() +
-      scale_y_discrete(limits = rev, guide = guide_axis(check.overlap = TRUE)) +
-      labs(x = "Time (Ma)", y = tools::toTitleCase(input$rank)) +
-      theme_bw() +
+    ggplot(range_time(), 
+           aes(xmin = earliestChronometricAge, 
+               xmax = latestChronometricAge, 
+               y = taxon,
+               colour = taxon)) +
+      # Range
+      geom_linerange() +
+      # Oldest point
+      geom_point(aes(x = earliestChronometricAge, 
+                     y = taxon)) +
+      # Youngest point
+      geom_point(aes(x = latestChronometricAge, 
+                     y = taxon)) +
+      # Tax label
+      geom_text(aes(x = earliestChronometricAge, 
+                    y = taxon, 
+                    # Reactive labels based on number of labels
+                    label = if (nrow(range_time()) < 150) taxon else (NA)),
+                # Adjustments
+                hjust = 1.1, check_overlap = TRUE) +
+      # Reverse x axis (geological time) and expand scale for labels
+      scale_x_reverse(expand = expansion(mult = 0.1)) +
+      # Reverse scale and expand scale
+      scale_y_discrete(limits = rev, 
+                       expand = expansion(mult = 0.05)) +
+      # Add labels
+      labs(x = "Time (Ma)", 
+           y = tools::toTitleCase(input$rank)) +
+      # Set default theme and base size
+      theme_bw(base_size = 16) +
+      # Customise theme
       theme(legend.position = "none",
-            axis.text = element_text(size = (12 - log(nrow(range_time())))),
-            panel.grid.minor.x = element_blank(),
-            panel.grid.major.x = element_blank())
+            axis.title.y = element_blank(),
+            axis.ticks.y = element_blank(),
+            axis.text.y = element_blank(),
+            panel.grid = element_blank()) +
+      # No clipping (important for labels)
+      coord_cartesian(clip = "off")
   )
   
   ## Taxonomic richness
